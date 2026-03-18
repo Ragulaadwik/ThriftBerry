@@ -47,13 +47,7 @@ public class Product {
         this.category = category;
     }
 
-    public Long getStockQuantity() {
-        return stockQuantity;
-    }
 
-    public void setStockQuantity(Long stockQuantity) {
-        this.stockQuantity = stockQuantity;
-    }
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long productId;
@@ -67,5 +61,5 @@ public class Product {
     private String category;
 
 
-    private Long stockQuantity;
+
 }
