@@ -18,8 +18,7 @@ public class ProductRequestOptionalFields {
     @Size(min = 1, message = "Category cannot be empty")
     private String category;
 
-    @Positive(message = "Stock quantity must be greater than 0")
-    private Long stockQuantity;
+
 
     public String getProductName() {
         return productName;
@@ -53,12 +52,6 @@ public class ProductRequestOptionalFields {
         this.category = category;
     }
 
-    public Long getStockQuantity() {
-        return stockQuantity;
-    }
 
-    public void setStockQuantity(Long stockQuantity) {
-        this.stockQuantity = stockQuantity;
-    }
 
 }

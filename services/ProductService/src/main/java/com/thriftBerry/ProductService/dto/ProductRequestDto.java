@@ -22,9 +22,7 @@ public class ProductRequestDto {
     @NotBlank(message = "Please specify the Category")
     private String category;
 
-    @NotNull(message = "Stock quantity is required")
-    @Min(value = 1, message = "Minimum one is required to add product")
-    private Long stockQuantity;
+
 
     public String getProductName() {
         return productName;
@@ -58,13 +56,7 @@ public class ProductRequestDto {
         this.category = category;
     }
 
-    public Long getStockQuantity() {
-        return stockQuantity;
-    }
 
-    public void setStockQuantity(Long stockQuantity) {
-        this.stockQuantity = stockQuantity;
-    }
 
 
 }
