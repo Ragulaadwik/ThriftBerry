@@ -1,0 +1,71 @@
+package com.thriftBerry.cartService.serviceImpl;
+
+import com.thriftBerry.cartService.communication.InventoryClient;
+import com.thriftBerry.cartService.communication.ProductClient;
+import com.thriftBerry.cartService.dto.AvailabilityResponse;
+import com.thriftBerry.cartService.dto.CartItemRequest;
+import com.thriftBerry.cartService.dto.ProductDto;
+import com.thriftBerry.cartService.model.Cart;
+import com.thriftBerry.cartService.model.CartItem;
+import com.thriftBerry.cartService.repository.CartItemRepository;
+import com.thriftBerry.cartService.repository.CartRepository;
+import com.thriftBerry.cartService.service.CartService;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+@Service
+public class CartServiceImpl implements CartService {
+
+    private final ProductClient productClient;
+    private final InventoryClient inventoryClient;
+    private final CartItemRepository cartItemRepository;
+    private final CartRepository cartRepository;
+
+    public CartServiceImpl(ProductClient productClient, InventoryClient inventoryClient, CartItemRepository cartItemRepository, CartRepository cartRepository) {
+        this.productClient = productClient;
+        this.inventoryClient = inventoryClient;
+        this.cartItemRepository = cartItemRepository;
+        this.cartRepository = cartRepository;
+    }
+
+
+    @Override
+    public String addToCart(CartItemRequest request) {
+
+        if(request.getQuantity()<=0){
+            throw new RuntimeException("Quantity must be at least one");
+        }
+
+        productClient.getProductById(request.getProductId());
+
+        AvailabilityResponse response = inventoryClient.checkAvailability(request.getProductId(),request.getQuantity());
+        System.out.println(response.getAvailable());
+        System.out.println(response.getAvailableQuantity());
+         if(Boolean.FALSE.equals(response.getAvailable())) {
+             throw new RuntimeException("Insufficient stock: Available Quantity:"+response.getAvailableQuantity());
+         }
+
+        Cart cart = cartRepository.findByUserId(request.getUserId()).orElseGet(()->{
+            Cart newCart = new Cart();
+            newCart.setUserId(request.getUserId());
+            return newCart;
+        });
+
+        Optional<CartItem> existingItem = cart.getCartItems().stream().
+                filter(item -> item.getProductId().equals(request.getProductId())).findFirst();
+
+        if(existingItem.isPresent()){
+            CartItem item = existingItem.get();
+            item.setQuantity(item.getQuantity()+ request.getQuantity());
+        }else{
+            CartItem newItem = new CartItem();
+            newItem.setQuantity(request.getQuantity());
+            newItem.setProductId(request.getProductId());
+            cart.additem(newItem);
+        }
+
+        cartRepository.save(cart);
+         return "Item saved to cart ";
+    }
+}
