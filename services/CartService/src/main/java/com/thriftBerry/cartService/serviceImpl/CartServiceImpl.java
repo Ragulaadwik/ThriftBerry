@@ -4,10 +4,10 @@ import com.thriftBerry.cartService.communication.InventoryClient;
 import com.thriftBerry.cartService.communication.ProductClient;
 import com.thriftBerry.cartService.dto.AvailabilityResponse;
 import com.thriftBerry.cartService.dto.CartItemRequest;
-import com.thriftBerry.cartService.dto.ProductDto;
+
 import com.thriftBerry.cartService.model.Cart;
 import com.thriftBerry.cartService.model.CartItem;
-import com.thriftBerry.cartService.repository.CartItemRepository;
+
 import com.thriftBerry.cartService.repository.CartRepository;
 import com.thriftBerry.cartService.service.CartService;
 import org.springframework.stereotype.Service;
@@ -19,13 +19,13 @@ public class CartServiceImpl implements CartService {
 
     private final ProductClient productClient;
     private final InventoryClient inventoryClient;
-    private final CartItemRepository cartItemRepository;
+
     private final CartRepository cartRepository;
 
-    public CartServiceImpl(ProductClient productClient, InventoryClient inventoryClient, CartItemRepository cartItemRepository, CartRepository cartRepository) {
+    public CartServiceImpl(ProductClient productClient, InventoryClient inventoryClient,  CartRepository cartRepository) {
         this.productClient = productClient;
         this.inventoryClient = inventoryClient;
-        this.cartItemRepository = cartItemRepository;
+
         this.cartRepository = cartRepository;
     }
 
