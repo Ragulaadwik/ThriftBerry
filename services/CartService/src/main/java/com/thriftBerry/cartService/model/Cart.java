@@ -39,6 +39,15 @@ public class Cart {
     @OneToMany(mappedBy = "cart",cascade = CascadeType.ALL,orphanRemoval = true)
     private List<CartItem> cartItems = new ArrayList<>();
 
+    @Override
+    public String toString() {
+        return "Cart{" +
+                "id=" + id +
+                ", userId=" + userId +
+                ", cartItems=" + cartItems +
+                '}';
+    }
+
     public  void additem(CartItem item){
         cartItems.add(item);
         item.setCart(this);
