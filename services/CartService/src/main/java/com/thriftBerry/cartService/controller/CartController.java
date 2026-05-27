@@ -4,6 +4,8 @@ import com.thriftBerry.cartService.dto.CartItemRequest;
 
 import com.thriftBerry.cartService.service.CartService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
 
+    private static final Logger log = LoggerFactory.getLogger(CartController.class);
     private final CartService cartService;
 
     public CartController(CartService cartService) {
@@ -27,9 +30,8 @@ public class CartController {
     @PostMapping
     public String addToCart(@RequestBody @Valid CartItemRequest cartItemRequest){
 
-////        return productClient.getProductById(cartItemRequest.getProductId());
-//        System.out.println(inventoryClient.checkAvailability(cartItemRequest.getProductId(),(Long) (cartItemRequest.getQuantity()).longValue()));
-//          return inventoryClient.checkAvailability(cartItemRequest.getProductId(),(Long) (cartItemRequest.getQuantity()).longValue());
+       log.info("Received add to cart request: UserId={}, ProductId={}, Quantity={}",
+               cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
             return cartService.addToCart(cartItemRequest);
     }
 

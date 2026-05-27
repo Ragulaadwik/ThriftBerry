@@ -7,6 +7,8 @@ import com.thriftBerry.inventoryService.mapper.InventoryMapper;
 import com.thriftBerry.inventoryService.model.Inventory;
 import com.thriftBerry.inventoryService.repository.InventoryRepository;
 import com.thriftBerry.inventoryService.service.InventoryService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import java.util.stream.Collectors;
 @Service
 public class InventoryServiceImpl implements InventoryService {
 
+    private static final Logger log = LoggerFactory.getLogger(InventoryServiceImpl.class);
     private final InventoryRepository inventoryRepository;
     private final InventoryMapper inventoryMapper;
 
@@ -29,6 +32,7 @@ public class InventoryServiceImpl implements InventoryService {
            Inventory inventory = inventoryMapper.toEntity(requestDto);
         System.out.println( "Inventory after Mapper" + inventory);
              Inventory saved =  inventoryRepository.save(inventory);
+             log.info("Inventory added for productId: {}, quantity: {}", saved.getProductId(), saved.getAvailableStock());
              return inventoryMapper.toResponse(saved);
     }
 
@@ -36,13 +40,15 @@ public class InventoryServiceImpl implements InventoryService {
     public List<InventoryResponse> getAllInventories() {
 
              List<Inventory> list =   inventoryRepository.findAll();
-
+                log.info("Retrieved {} inventory records", list.size());
                 return list.stream().map(inventoryMapper::toResponse).collect(Collectors.toList());
     }
 
     @Override
     public InventoryResponse getInventoryById(Long id) {
         Inventory inventory= inventoryRepository.findById(id).orElseThrow(()->new InventoryNotFoundException(id));
+        log.info("Retrieved inventory for id: {}, productId: {}, availableStock: {}", inventory.getId(), inventory.getProductId(), inventory.getAvailableStock());
+
         return inventoryMapper.toResponse(inventory);
     }
 
@@ -53,8 +59,12 @@ public class InventoryServiceImpl implements InventoryService {
         try{
             inventory.reserveStock(request.getQuantity());
         }catch (IllegalArgumentException ex){
+            log.error("Failed to reserve stock for productId: {}, requestedQuantity: {}, availableStock: {}. Reason: {}",
+                    request.getProductId(), request.getQuantity(), inventory.getAvailableStock(), ex.getMessage());
             throw new InventoryConflictException(ex.getMessage());
         }
+        log.info("Reserved stock for productId: {}, quantity: {}, availableStock after reservation: {}",
+                request.getProductId(), request.getQuantity(), inventory.getAvailableStock());
         return buildResponse(inventory,"Inventory reserve successful");
     }
 
@@ -65,8 +75,12 @@ public class InventoryServiceImpl implements InventoryService {
         try{
             inventory.releaseStock(request.getQuantity());
         }catch (IllegalArgumentException ex){
+            log.error("Failed to release stock for productId: {}, requestedQuantity: {}, reservedStock: {}. Reason: {}",
+                    request.getProductId(), request.getQuantity(), inventory.getReservedStock(), ex.getMessage());
             throw new InventoryConflictException(ex.getMessage());
         }
+        log.info("Released stock for productId: {}, quantity: {}, reservedStock after release: {}",
+                request.getProductId(), request.getQuantity(), inventory.getReservedStock());
         return buildResponse(inventory,"Inventory release successful");
 
     }
@@ -79,8 +93,12 @@ public class InventoryServiceImpl implements InventoryService {
         try{
             inventory.confirmStock(request.getQuantity());
         }catch (IllegalArgumentException ex){
+            log.error("Failed to confirm stock for productId: {}, requestedQuantity: {}, reservedStock: {}. Reason: {}",
+                    request.getProductId(), request.getQuantity(), inventory.getReservedStock(), ex.getMessage());
             throw new InventoryConflictException(ex.getMessage());
         }
+        log.info("Confirmed stock for productId: {}, quantity: {}, reservedStock after confirmation: {}",
+                request.getProductId(), request.getQuantity(), inventory.getReservedStock());
         return buildResponse(inventory,"Inventory confirm successful");
     }
 
@@ -92,6 +110,8 @@ public class InventoryServiceImpl implements InventoryService {
         availabilityResponse.setProductId(productId);
         availabilityResponse.setAvailableQuantity(product.getAvailableStock());
         availabilityResponse.setAvailable(product.getAvailableStock() >= available);
+        log.info("Checked availability for productId: {}, requestedQuantity: {}, availableStock: {}, isAvailable: {}",
+                productId, available, product.getAvailableStock(), availabilityResponse.getAvailable());
         return availabilityResponse;
     }
 
