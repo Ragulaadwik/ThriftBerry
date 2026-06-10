@@ -2,6 +2,7 @@ package com.thriftBerry.cartService.service;
 
 import com.thriftBerry.cartService.dto.CartItemRequest;
 import com.thriftBerry.cartService.model.Cart;
+import jakarta.validation.Valid;
 
 /**
  * Service interface for cart operations.
@@ -27,4 +28,6 @@ public interface CartService {
      * @throws com.thriftBerry.cartService.exceptions.InvalidInputException if userId is invalid
      */
     Cart getCartByUserId(Long userId);
+
+    Cart updateCartItem(@Valid CartItemRequest cartItemRequest);
 }
