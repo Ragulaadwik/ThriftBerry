@@ -45,4 +45,12 @@ public class CartController {
         return ResponseEntity.ok(cart);
     }
 
+    @PutMapping
+    public ResponseEntity<String> updateCartItem(@RequestBody @Valid CartItemRequest cartItemRequest){
+        log.info("Received update cart item request: UserId={}, ProductId={}, Quantity={}",
+                cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+         cartService.updateCartItem(cartItemRequest);
+        return ResponseEntity.ok("Cart item updated successfully");
+    }
+
 }

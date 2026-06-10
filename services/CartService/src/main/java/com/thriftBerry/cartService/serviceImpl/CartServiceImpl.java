@@ -49,25 +49,8 @@ public class CartServiceImpl implements CartService {
         log.debug("Processing add to cart request: userId={}, productId={}, quantity={}", 
                   request.getUserId(), request.getProductId(), request.getQuantity());
 
-        try {
-            // Verify product exists
-            productClient.getProductById(request.getProductId());
-            log.debug("Product verification successful for productId: {}", request.getProductId());
-
-            // Check inventory availability
-            AvailabilityResponse response = inventoryClient.checkAvailability(
-                    request.getProductId(), 
-                    request.getQuantity()
-            );
-
-            if (Boolean.FALSE.equals(response.getAvailable())) {
-                log.warn("Insufficient stock for productId: {} requested quantity: {} by userId: {}. Available: {}",
-                        request.getProductId(), request.getQuantity(), request.getUserId(), response.getAvailableQuantity());
-                throw new RuntimeException(String.format(INSUFFICIENT_STOCK_MSG, response.getAvailableQuantity()));
-            }
-
-            log.info("Stock verified. Adding to cart: userId={}, productId={}, quantity={}", 
-                     request.getUserId(), request.getProductId(), request.getQuantity());
+        verifyProductExists(request.getProductId());
+        checkInventoryAvailability(request.getProductId(), request.getQuantity());
 
             // Get or create cart
             Cart cart = cartRepository.findByUserId(request.getUserId()).orElseGet(() -> {
@@ -104,12 +87,8 @@ public class CartServiceImpl implements CartService {
             
             return "Item saved to cart";
             
-        } catch (Exception e) {
-            log.error("Error adding item to cart for userId: {}, productId: {}", 
-                     request.getUserId(), request.getProductId(), e);
-            throw e;
         }
-    }
+
 
     /**
      * Validates the add to cart request.
@@ -170,6 +149,35 @@ public class CartServiceImpl implements CartService {
         }
     }
 
+    @Override
+    public Cart updateCartItem(CartItemRequest cartItemRequest) {
+        validateAddToCartRequest(cartItemRequest);
+        log.debug("Processing update cart item request: userId={}, productId={}, quantity={}",
+                  cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+
+        //verify product exists and check inventory before updating cart item
+         verifyProductExists(cartItemRequest.getProductId());
+         checkInventoryAvailability(cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+
+        Cart cart = cartRepository.findByUserId(cartItemRequest.getUserId())
+                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + cartItemRequest.getUserId()));
+
+        Optional<CartItem> existingItem = cart.getCartItems().stream()
+                .filter(item -> item.getProductId().equals(cartItemRequest.getProductId()))
+                .findFirst();
+
+        if(existingItem.isPresent()) {
+            CartItem item = existingItem.get();
+            item.setQuantity(cartItemRequest.getQuantity());
+            log.debug("Updated cart item. ProductId: {}, new quantity: {}",
+                     cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+        }
+
+        log.info("Cart item updated successfully for userId: {}. ProductId: {}, Quantity: {}",
+                 cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+        return cartRepository.save(cart);
+    }
+
     /**
      * Validates if the provided user ID is valid.
      *
@@ -180,6 +188,33 @@ public class CartServiceImpl implements CartService {
         if (userId == null || userId <= 0) {
             log.warn("Invalid userId provided: {}", userId);
             throw new InvalidInputException(INVALID_USER_ID_MSG);
+        }
+    }
+
+
+    private void verifyProductExists(Long productId) {
+        try {
+            productClient.getProductById(productId);
+            log.debug("Product verification successful for productId: {}", productId);
+        } catch (Exception e) {
+            log.error("Product verification failed for productId: {}", productId, e);
+            throw new RuntimeException("Product not found with ID: " + productId, e);
+        }
+    }
+
+    private void checkInventoryAvailability(Long productId, Long quantity) {
+        try {
+            AvailabilityResponse response = inventoryClient.checkAvailability(productId, quantity);
+            if (Boolean.FALSE.equals(response.getAvailable())) {
+                log.warn("Insufficient stock for productId: {} requested quantity: {}. Available: {}",
+                        productId, quantity, response.getAvailableQuantity());
+                throw new RuntimeException(String.format(INSUFFICIENT_STOCK_MSG, response.getAvailableQuantity()));
+            }
+            log.debug("Stock verified for productId: {}. Requested quantity: {}, Available: {}",
+                     productId, quantity, response.getAvailableQuantity());
+        } catch (Exception e) {
+            log.error("Inventory check failed for productId: {}", productId, e);
+            throw new RuntimeException("Failed to check inventory for product ID: " + productId, e);
         }
     }
 }
