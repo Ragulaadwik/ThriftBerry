@@ -23,15 +23,12 @@ public class CartController {
     }
 
 
-
-
-
     @PostMapping
-    public String addToCart(@RequestBody @Valid CartItemRequest cartItemRequest){
+    public String addToCart(@RequestBody @Valid CartItemRequest cartItemRequest) {
 
-       log.info("Received add to cart request: UserId={}, ProductId={}, Quantity={}",
-               cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
-            return cartService.addToCart(cartItemRequest);
+        log.info("Received add to cart request: UserId={}, ProductId={}, Quantity={}",
+                cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+        return cartService.addToCart(cartItemRequest);
     }
 
     @GetMapping
@@ -46,17 +43,23 @@ public class CartController {
     }
 
     @PutMapping
-    public ResponseEntity<String> updateCartItem(@RequestBody @Valid CartItemRequest cartItemRequest){
+    public ResponseEntity<String> updateCartItem(@RequestBody @Valid CartItemRequest cartItemRequest) {
         log.info("Received update cart item request: UserId={}, ProductId={}, Quantity={}",
                 cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
-         cartService.updateCartItem(cartItemRequest);
+        cartService.updateCartItem(cartItemRequest);
         return ResponseEntity.ok("Cart item updated successfully");
     }
 
     @DeleteMapping("{userId}/products/{productId}")
-    public ResponseEntity<String> removeItemFromCart(@PathVariable Long userId,@PathVariable Long productId ){
-        log.info("Request received to delete productId-{},for userId-{}",productId,userId);
-        return ResponseEntity.ok(cartService.removeProduct(userId,productId));
+    public ResponseEntity<String> removeItemFromCart(@PathVariable Long userId, @PathVariable Long productId) {
+        log.info("Request received to delete productId-{},for userId-{}", productId, userId);
+        return ResponseEntity.ok(cartService.removeProduct(userId, productId));
     }
 
+    @DeleteMapping("{userId}")
+    public ResponseEntity<String> clearCart(@PathVariable Long userId) {
+        log.info("Request received to clear cart for userId-{}", userId);
+        return ResponseEntity.ok(cartService.clearCart(userId));
+
+    }
 }

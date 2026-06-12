@@ -32,4 +32,6 @@ public interface CartService {
     Cart updateCartItem(@Valid CartItemRequest cartItemRequest);
 
     String removeProduct(Long userId, Long productId);
+
+    String clearCart(Long userId);
 }
