@@ -53,4 +53,10 @@ public class CartController {
         return ResponseEntity.ok("Cart item updated successfully");
     }
 
+    @DeleteMapping("{userId}/products/{productId}")
+    public ResponseEntity<String> removeItemFromCart(@PathVariable Long userId,@PathVariable Long productId ){
+        log.info("Request received to delete productId-{},for userId-{}",productId,userId);
+        return ResponseEntity.ok(cartService.removeProduct(userId,productId));
+    }
+
 }

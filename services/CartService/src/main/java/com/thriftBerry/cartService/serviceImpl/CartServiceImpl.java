@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -26,6 +27,9 @@ public class CartServiceImpl implements CartService {
     private static final String INSUFFICIENT_STOCK_MSG = "Insufficient stock: Available Quantity: %d";
     private static final String INVALID_USER_ID_MSG = "User ID must be positive";
     private static final String INVALID_REQUEST_MSG = "Cart item request cannot be null";
+    private static final String INVALID_PRODUCT_ID_MSG = "Product ID must be positive";
+    private static final String PRODUCT_REMOVED_MSG = "Product removed successfully from cart";
+    private static final String PRODUCT_NOT_FOUND_MSG = "Product not found in cart";
 
     private final ProductClient productClient;
     private final InventoryClient inventoryClient;
@@ -149,33 +153,147 @@ public class CartServiceImpl implements CartService {
         }
     }
 
+    /**
+     * Updates a product quantity in the user's cart.
+     * <p>
+     * Industry standard improvements:
+     * - Input validation for request data
+     * - Transactional handling for data consistency
+     * - Inventory verification before update
+     * - Validates product exists in cart before updating
+     * - Comprehensive logging with appropriate log levels
+     * - Proper exception handling
+     * - Clear error messages for debugging
+     *
+     * @param cartItemRequest the cart item request containing userId, productId, and new quantity
+     * @return updated Cart object
+     * @throws InvalidInputException if cartItemRequest is invalid
+     * @throws RuntimeException      if product not found in cart or inventory check fails
+     */
     @Override
+    @Transactional
     public Cart updateCartItem(CartItemRequest cartItemRequest) {
+        
+        // Input validation
         validateAddToCartRequest(cartItemRequest);
+        
         log.debug("Processing update cart item request: userId={}, productId={}, quantity={}",
                   cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
 
-        //verify product exists and check inventory before updating cart item
-         verifyProductExists(cartItemRequest.getProductId());
-         checkInventoryAvailability(cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+        try {
+            // Verify product exists and check inventory before updating cart item
+            verifyProductExists(cartItemRequest.getProductId());
+            checkInventoryAvailability(cartItemRequest.getProductId(), cartItemRequest.getQuantity());
 
-        Cart cart = cartRepository.findByUserId(cartItemRequest.getUserId())
-                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + cartItemRequest.getUserId()));
+            // Get cart for user
+            Cart cart = getCartByUserId(cartItemRequest.getUserId());
 
-        Optional<CartItem> existingItem = cart.getCartItems().stream()
-                .filter(item -> item.getProductId().equals(cartItemRequest.getProductId()))
-                .findFirst();
+            // Find item in cart
+            Optional<CartItem> existingItem = cart.getCartItems().stream()
+                    .filter(item -> item.getProductId().equals(cartItemRequest.getProductId()))
+                    .findFirst();
 
-        if(existingItem.isPresent()) {
+            // If item not found in cart, throw exception
+            if (existingItem.isEmpty()) {
+                log.warn("Product not found in cart for update. UserId: {}, ProductId: {}",
+                         cartItemRequest.getUserId(), cartItemRequest.getProductId());
+                throw new RuntimeException("Product with ID: " + cartItemRequest.getProductId() + 
+                                         " not found in cart for user: " + cartItemRequest.getUserId());
+            }
+
+            // Update the item quantity
             CartItem item = existingItem.get();
+            long previousQuantity = item.getQuantity();
             item.setQuantity(cartItemRequest.getQuantity());
-            log.debug("Updated cart item. ProductId: {}, new quantity: {}",
-                     cartItemRequest.getProductId(), cartItemRequest.getQuantity());
-        }
+            
+            log.debug("Updated cart item. ProductId: {}, previous quantity: {}, new quantity: {}",
+                     cartItemRequest.getProductId(), previousQuantity, cartItemRequest.getQuantity());
 
-        log.info("Cart item updated successfully for userId: {}. ProductId: {}, Quantity: {}",
-                 cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
-        return cartRepository.save(cart);
+            // Save and return updated cart
+            Cart updatedCart = cartRepository.save(cart);
+            
+            log.info("Cart item updated successfully for userId: {}. ProductId: {}, Quantity: {}",
+                     cartItemRequest.getUserId(), cartItemRequest.getProductId(), cartItemRequest.getQuantity());
+            
+            return updatedCart;
+            
+        } catch (InvalidInputException e) {
+            log.error("Validation error while updating cart item. UserId: {}, ProductId: {}, Error: {}",
+                     cartItemRequest.getUserId(), cartItemRequest.getProductId(), e.getMessage());
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Error occurred while updating cart item. UserId: {}, ProductId: {}",
+                     cartItemRequest.getUserId(), cartItemRequest.getProductId(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Removes a product from the user's cart.
+     * <p>
+     * Industry standard improvements:
+     * - Input validation for both userId and productId
+     * - Transactional handling for data consistency
+     * - Comprehensive logging with appropriate log levels
+     * - Null safety checks
+     * - Proper exception handling
+     * - Clear success/failure messages
+     *
+     * @param userId     the user ID whose cart to modify
+     * @param productId  the product ID to remove from cart
+     * @return success message if product was removed, failure message otherwise
+     * @throws InvalidInputException if userId or productId is invalid
+     * @throws RuntimeException      if cart not found or removal fails
+     */
+    @Override
+    @Transactional
+    public String removeProduct(Long userId, Long productId) {
+        
+        // Input validation
+        validateUserId(userId);
+        validateProductId(productId);
+        
+        log.debug("Attempting to remove product from cart. UserId: {}, ProductId: {}", userId, productId);
+        
+        try {
+            // Get or throw exception if cart not found
+            Cart cart = getCartByUserIdOrThrow(userId);
+            
+            // Validate cart is not empty
+            if (cart.getCartItems() == null || cart.getCartItems().isEmpty()) {
+                log.warn("Cart is empty for userId: {}. Cannot remove productId: {}", userId, productId);
+                return PRODUCT_NOT_FOUND_MSG;
+            }
+            
+            // Remove product from cart
+            boolean removed = cart.getCartItems().removeIf(item -> 
+                Objects.equals(item.getProductId(), productId)
+            );
+            
+            if (removed) {
+                // Save cart after modification
+                saveCart(cart);
+                log.info("Product removed successfully from cart. UserId: {}, ProductId: {}, Remaining items: {}",
+                        userId, productId, cart.getCartItems().size());
+                return PRODUCT_REMOVED_MSG;
+            } else {
+                log.debug("Product not found in cart for removal. UserId: {}, ProductId: {}", userId, productId);
+                return PRODUCT_NOT_FOUND_MSG;
+            }
+            
+        } catch (InvalidInputException e) {
+            log.error("Validation error while removing product. UserId: {}, ProductId: {}, Error: {}",
+                     userId, productId, e.getMessage());
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Error occurred while removing product from cart. UserId: {}, ProductId: {}",
+                     userId, productId, e);
+            throw new RuntimeException("Failed to remove product from cart: " + e.getMessage(), e);
+        }
+    }
+
+    private void saveCart(Cart cart){
+        cartRepository.save(cart);
     }
 
     /**
@@ -188,6 +306,19 @@ public class CartServiceImpl implements CartService {
         if (userId == null || userId <= 0) {
             log.warn("Invalid userId provided: {}", userId);
             throw new InvalidInputException(INVALID_USER_ID_MSG);
+        }
+    }
+
+    /**
+     * Validates if the provided product ID is valid.
+     *
+     * @param productId the product ID to validate
+     * @throws InvalidInputException if productId is null or not positive
+     */
+    private void validateProductId(Long productId) {
+        if (productId == null || productId <= 0) {
+            log.warn("Invalid productId provided: {}", productId);
+            throw new InvalidInputException(INVALID_PRODUCT_ID_MSG);
         }
     }
 
@@ -216,5 +347,11 @@ public class CartServiceImpl implements CartService {
             log.error("Inventory check failed for productId: {}", productId, e);
             throw new RuntimeException("Failed to check inventory for product ID: " + productId, e);
         }
+    }
+
+
+    private Cart getCartByUserIdOrThrow(Long userId){
+        return cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + userId));
     }
 }

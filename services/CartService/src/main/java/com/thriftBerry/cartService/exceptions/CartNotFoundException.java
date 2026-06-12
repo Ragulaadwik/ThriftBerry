@@ -22,4 +22,3 @@ public class CartNotFoundException extends RuntimeException {
         return userId;
     }
 }
-
