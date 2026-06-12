@@ -30,6 +30,8 @@ public class CartServiceImpl implements CartService {
     private static final String INVALID_PRODUCT_ID_MSG = "Product ID must be positive";
     private static final String PRODUCT_REMOVED_MSG = "Product removed successfully from cart";
     private static final String PRODUCT_NOT_FOUND_MSG = "Product not found in cart";
+    private static final String CART_CLEARED_MSG = "Cart cleared successfully";
+    private static final String CART_ALREADY_EMPTY_MSG = "Cart is already empty for user";
 
     private final ProductClient productClient;
     private final InventoryClient inventoryClient;
@@ -289,6 +291,65 @@ public class CartServiceImpl implements CartService {
             log.error("Error occurred while removing product from cart. UserId: {}, ProductId: {}",
                      userId, productId, e);
             throw new RuntimeException("Failed to remove product from cart: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Clears all items from the user's cart.
+     * <p>
+     * Industry standard improvements:
+     * - Input validation to ensure valid userId
+     * - Transactional handling for data consistency
+     * - Null safety checks before clearing cart items
+     * - Validation that cart exists before clearing
+     * - Comprehensive logging with appropriate log levels
+     * - Detects if cart is already empty and logs accordingly
+     * - Proper exception handling with context
+     * - Uses constants for return messages
+     * - Returns meaningful message to caller
+     *
+     * @param userId the user ID whose cart to clear
+     * @return success message if cart was cleared, info message if already empty
+     * @throws InvalidInputException if userId is invalid
+     * @throws RuntimeException      if cart not found or clearing fails
+     */
+    @Override
+    @Transactional
+    public String clearCart(Long userId) {
+        
+        // Input validation
+        validateUserId(userId);
+        
+        log.debug("Attempting to clear cart for userId: {}", userId);
+        
+        try {
+            // Get cart or throw exception if not found
+            Cart cart = getCartByUserIdOrThrow(userId);
+            
+            // Check if cart items exist and are not empty
+            if (cart.getCartItems() == null || cart.getCartItems().isEmpty()) {
+                log.info("Cart is already empty for userId: {}", userId);
+                return CART_ALREADY_EMPTY_MSG;
+            }
+            
+            // Get count of items before clearing for logging
+            int itemCount = cart.getCartItems().size();
+            
+            // Clear all items from cart
+            cart.getCartItems().clear();
+            saveCart(cart);
+            
+            log.info("Cart cleared successfully for userId: {}. Removed {} items from cart",
+                     userId, itemCount);
+            
+            return CART_CLEARED_MSG;
+            
+        } catch (InvalidInputException e) {
+            log.error("Validation error while clearing cart. UserId: {}, Error: {}", userId, e.getMessage());
+            throw e;
+        } catch (RuntimeException e) {
+            log.error("Error occurred while clearing cart for userId: {}", userId, e);
+            throw new RuntimeException("Failed to clear cart for user: " + userId, e);
         }
     }
 
