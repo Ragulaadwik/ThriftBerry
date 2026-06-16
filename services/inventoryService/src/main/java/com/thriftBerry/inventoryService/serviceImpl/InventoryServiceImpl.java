@@ -30,7 +30,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public InventoryResponse addInventory(RequestDto requestDto) {
            Inventory inventory = inventoryMapper.toEntity(requestDto);
-        System.out.println( "Inventory after Mapper" + inventory);
+
              Inventory saved =  inventoryRepository.save(inventory);
              log.info("Inventory added for productId: {}, quantity: {}", saved.getProductId(), saved.getAvailableStock());
              return inventoryMapper.toResponse(saved);
