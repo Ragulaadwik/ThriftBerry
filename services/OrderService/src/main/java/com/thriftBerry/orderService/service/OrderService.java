@@ -77,6 +77,8 @@ public class OrderService {
             // business decision: after successful persistence, confirm inventory
             confirmInventoryForReserved(reserved);
 
+            clearCart(orderRequest.getUserId());
+
             response.setOrderId(saved.getOrderId());
             response.setTotalAmount(saved.getTotalAmount());
             response.setStatus(saved.getOrderStatus().name());
@@ -95,6 +97,16 @@ public class OrderService {
 
             response.setMessage("Failed to place order: " + ex.getMessage());
             return response;
+        }
+    }
+
+    private void clearCart(Long userId) {
+        try {
+            cartClient.clearCart(userId);
+            log.info("Cleared cart for userId {}", userId);
+        } catch (Exception ex) {
+            log.error("Failed to clear cart for userId {}: {}", userId, ex.getMessage(), ex);
+
         }
     }
 
