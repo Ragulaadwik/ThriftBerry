@@ -2,12 +2,14 @@ package com.thriftBerry.orderService.service;
 
 import com.thriftBerry.orderService.communication.CartClient;
 import com.thriftBerry.orderService.communication.InventoryClient;
+import com.thriftBerry.orderService.dto.OrderList;
 import com.thriftBerry.orderService.dto.OrderRequest;
 import com.thriftBerry.orderService.dto.OrderResponse;
 
 import com.thriftBerry.orderService.dto.cart.CartResponse;
 import com.thriftBerry.orderService.dto.inventory.InventoryRequest;
 import com.thriftBerry.orderService.exception.InvalidUserException;
+import com.thriftBerry.orderService.mapper.OrderItemMapper;
 import com.thriftBerry.orderService.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,10 +17,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
+
 import com.thriftBerry.orderService.dto.inventory.InventoryResponse;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -34,11 +35,13 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartClient cartClient;
     private final InventoryClient inventoryClient;
+    private final OrderItemMapper orderItemMapper;
 
-    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient) {
+    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper) {
         this.orderRepository = orderRepository;
         this.cartClient = cartClient;
         this.inventoryClient = inventoryClient;
+        this.orderItemMapper = orderItemMapper;
     }
 
     @Transactional
@@ -82,6 +85,7 @@ public class OrderService {
             response.setOrderId(saved.getOrderId());
             response.setTotalAmount(saved.getTotalAmount());
             response.setStatus(saved.getOrderStatus().name());
+            response.setOrderItems(orderItemMapper.toItemResponseList(saved.getOrderItems()));
             response.setMessage("Order placed successfully");
             return response;
         } catch (Exception ex) {
@@ -229,5 +233,58 @@ public class OrderService {
         order.setCreatedAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
         return order;
+    }
+
+    public OrderResponse getOrder(Long orderId) {
+        OrderResponse response = new OrderResponse();
+        try {
+            Optional<Order> orderOpt = orderRepository.findById(orderId);
+            if (orderOpt.isPresent()) {
+                Order order = orderOpt.get();
+                response.setOrderId(order.getOrderId());
+                response.setTotalAmount(order.getTotalAmount());
+                response.setStatus(order.getOrderStatus().name());
+                response.setOrderItems(orderItemMapper.toItemResponseList(order.getOrderItems()));
+                log.info("Fetched orderItem for orderId {}: {}", orderId, response);
+                response.setMessage("Order retrieved successfully");
+            } else {
+                response.setMessage("Order not found for orderId " + orderId);
+            }
+        } catch (Exception ex) {
+            log.error("Failed to retrieve order for orderId {}: {}", orderId, ex.getMessage(), ex);
+            response.setMessage("Failed to retrieve order: " + ex.getMessage());
+        }
+        return response;
+    }
+
+    public OrderList getOrdersByUserId(Long userId) {
+
+        validateUserId(userId);
+        OrderList list = new OrderList();
+        list.setUserId(userId);
+       List<OrderResponse> response = new ArrayList<>();
+           try {
+            List<Order> orders = orderRepository.findByUserId(userId);
+            if (orders != null && !orders.isEmpty()) {
+                for(Order o : orders) {
+                    OrderResponse r = new OrderResponse();
+                    r.setOrderId(o.getOrderId());
+                    r.setTotalAmount(o.getTotalAmount());
+                    r.setStatus(o.getOrderStatus().name());
+                    r.setOrderItems(orderItemMapper.toItemResponseList(o.getOrderItems()));
+                    response.add(r);
+                }
+                list.setOrderList(response);
+                list.setNumberOfOrders(orders.size());
+                log.info("Fetched {} orders for userId {}", orders.size(), userId);
+                list.setMessage("Orders retrieved successfully");
+            } else {
+                list.setMessage("No orders found for userId " + userId);
+            }
+        } catch (Exception ex) {
+            log.error("Failed to retrieve orders for userId {}: {}", userId, ex.getMessage(), ex);
+            list.setMessage("Failed to retrieve orders: " + ex.getMessage());
+        }
+        return list;
     }
 }

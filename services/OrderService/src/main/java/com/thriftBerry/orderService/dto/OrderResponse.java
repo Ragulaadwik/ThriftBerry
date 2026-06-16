@@ -1,16 +1,32 @@
 package com.thriftBerry.orderService.dto;
 
+
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Response returned when an order is placed. Contains summary information suitable for clients.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class OrderResponse {
 
     private Long orderId;
     private BigDecimal totalAmount;
     private String status;
     private String message;
+
+    public List<ItemResponse> getOrderItems() {
+        return OrderItems;
+    }
+
+    public void setOrderItems(List<ItemResponse> orderItems) {
+        this.OrderItems = orderItems;
+    }
+
+    private List<ItemResponse> OrderItems;
 
     public OrderResponse() {
     }
