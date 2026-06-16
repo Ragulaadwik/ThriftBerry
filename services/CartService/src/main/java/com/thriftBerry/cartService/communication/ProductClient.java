@@ -1,5 +1,6 @@
 package com.thriftBerry.cartService.communication;
 
+import com.thriftBerry.cartService.dto.ProductDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -8,5 +9,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface ProductClient {
 
     @GetMapping("/products/{id}")
-    Object getProductById(@PathVariable Long id);
+    ProductDto getProductById(@PathVariable Long id);
 }

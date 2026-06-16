@@ -3,6 +3,8 @@ package com.thriftBerry.cartService.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
+
+
 @Entity
 public class CartItem {
     @Id
@@ -35,6 +37,9 @@ public class CartItem {
 
     private Long productId;
     private Long quantity;
+
+
+
     @ManyToOne
     @JoinColumn(name ="cartId")
     @JsonIgnore

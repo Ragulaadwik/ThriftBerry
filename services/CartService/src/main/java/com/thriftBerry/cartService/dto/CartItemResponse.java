@@ -1,5 +1,7 @@
 package com.thriftBerry.cartService.dto;
 
+import java.math.BigDecimal;
+
 public class CartItemResponse {
 
     private Long id;
@@ -30,5 +32,14 @@ public class CartItemResponse {
 
     private Long productId;
 
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
     private Integer quantity;
+    private BigDecimal price;
 }
