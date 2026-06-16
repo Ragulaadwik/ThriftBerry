@@ -3,12 +3,14 @@ package com.thriftBerry.cartService.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 
 
 @Entity
 public class CartItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonIgnore
     private Long id;
 
     public Long getId() {
@@ -36,7 +38,17 @@ public class CartItem {
     }
 
     private Long productId;
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
     private Long quantity;
+    private BigDecimal price;
 
 
 
