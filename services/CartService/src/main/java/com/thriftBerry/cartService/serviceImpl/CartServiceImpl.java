@@ -4,6 +4,7 @@ import com.thriftBerry.cartService.communication.InventoryClient;
 import com.thriftBerry.cartService.communication.ProductClient;
 import com.thriftBerry.cartService.dto.AvailabilityResponse;
 import com.thriftBerry.cartService.dto.CartItemRequest;
+import com.thriftBerry.cartService.dto.ProductDto;
 import com.thriftBerry.cartService.exceptions.InvalidInputException;
 import com.thriftBerry.cartService.model.Cart;
 import com.thriftBerry.cartService.model.CartItem;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -52,10 +54,14 @@ public class CartServiceImpl implements CartService {
         // Input validation
         validateAddToCartRequest(request);
         
-        log.debug("Processing add to cart request: userId={}, productId={}, quantity={}", 
+        log.debug("Processing add to cart request: userId={}, productId={}, quantity={} ",
                   request.getUserId(), request.getProductId(), request.getQuantity());
 
-        verifyProductExists(request.getProductId());
+         verifyProductExists(request.getProductId());
+         ProductDto productDto = productClient.getProductById(request.getProductId());
+        BigDecimal price = productDto.getPrice();
+         log.debug("Product details retrieved for productId: {}. Product Name: {}, Price: {}",
+                  request.getProductId(), productDto.getProductName(), productDto.getPrice());
         checkInventoryAvailability(request.getProductId(), request.getQuantity());
 
             // Get or create cart
@@ -81,15 +87,16 @@ public class CartServiceImpl implements CartService {
                 CartItem newItem = new CartItem();
                 newItem.setQuantity(request.getQuantity());
                 newItem.setProductId(request.getProductId());
+                newItem.setPrice(price);
                 cart.additem(newItem);
-                log.debug("Added new cart item. ProductId: {}, quantity: {}", 
-                         request.getProductId(), request.getQuantity());
+                log.debug("Added new cart item. ProductId: {}, quantity: {}, price: {}",
+                         request.getProductId(), request.getQuantity(),price);
             }
 
             // Save cart
             cartRepository.save(cart);
-            log.info("Cart saved successfully for userId: {}. ProductId: {}, Quantity: {}", 
-                     request.getUserId(), request.getProductId(), request.getQuantity());
+            log.info("Cart saved successfully for userId: {}. ProductId: {}, Quantity: {}, price: {}",
+                     request.getUserId(), request.getProductId(), request.getQuantity(),price);
             
             return "Item saved to cart";
             
@@ -207,6 +214,7 @@ public class CartServiceImpl implements CartService {
             CartItem item = existingItem.get();
             long previousQuantity = item.getQuantity();
             item.setQuantity(cartItemRequest.getQuantity());
+
             
             log.debug("Updated cart item. ProductId: {}, previous quantity: {}, new quantity: {}",
                      cartItemRequest.getProductId(), previousQuantity, cartItemRequest.getQuantity());
