@@ -24,9 +24,9 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<CartResponse> placeOrder(@RequestBody OrderRequest orderRequest){
+    public ResponseEntity<OrderResponse> placeOrder(@RequestBody OrderRequest orderRequest){
         log.info("Request received to place order for userId :{}",orderRequest.getUserId());
-        CartResponse response = orderService.placeOrder(orderRequest);
+        OrderResponse response = orderService.placeOrder(orderRequest);
         return ResponseEntity.ok(response);
     }
 }
