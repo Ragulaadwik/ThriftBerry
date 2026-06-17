@@ -19,4 +19,6 @@ public interface InventoryService {
     InventoryBookingResponse confirmInventory(@Valid InventoryBookingRequest request);
 
     AvailabilityResponse checkAvailability(Long productId, Long available);
+
+    InventoryBookingResponse restockInventory(@Valid InventoryBookingRequest request);
 }

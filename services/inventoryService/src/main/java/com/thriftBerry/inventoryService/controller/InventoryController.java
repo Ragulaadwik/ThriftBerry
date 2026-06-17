@@ -67,6 +67,17 @@ public class InventoryController {
 
     }
 
+    @PostMapping("/restock")
+    public ResponseEntity<InventoryBookingResponse> restockInventory(@RequestBody @Valid InventoryBookingRequest request){
+        log.info("Received request to restock inventory: {}", request);
+        InventoryBookingResponse response = inventoryService.restockInventory(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+    }
+
+
+
     @GetMapping("/{productId}/availability")
     public ResponseEntity<AvailabilityResponse> checkAvailability(
             @PathVariable Long productId,

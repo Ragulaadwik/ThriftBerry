@@ -115,6 +115,33 @@ public class InventoryServiceImpl implements InventoryService {
         return availabilityResponse;
     }
 
+    @Override
+    public InventoryBookingResponse restockInventory(InventoryBookingRequest request) {
+        // Validate input quantity
+        if (request == null || request.getQuantity() <= 0) {
+            log.error("Invalid restock request: {}", request);
+            throw new IllegalArgumentException("Restock quantity must be a positive value");
+        }
+
+        // Retrieve inventory by productId (throws InventoryNotFoundException if missing)
+        Inventory inventory = getInventoryOrThrow(request.getProductId());
+
+        // Increment available stock instead of overwriting it. This is safer for real-world restock flows.
+        long currentAvailable = inventory.getAvailableStock() == null ? 0L : inventory.getAvailableStock();
+        long increment = request.getQuantity();
+        long updatedAvailable = currentAvailable + increment;
+
+        inventory.setAvailableStock(updatedAvailable);
+
+        // Persist changes
+        Inventory saved = inventoryRepository.save(inventory);
+
+        log.info("Restocked inventory for productId: {}, addedQuantity: {}, availableStock after restock: {}",
+                request.getProductId(), increment, saved.getAvailableStock());
+
+        return buildResponse(saved, "Inventory restock successful");
+    }
+
     private Inventory getInventoryOrThrow(Long productId) {
         return inventoryRepository.findByProductId(productId)
                 .orElseThrow(() -> new InventoryNotFoundException(productId));
