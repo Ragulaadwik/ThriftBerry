@@ -75,7 +75,8 @@ public class OrderService {
             Order order = buildOrderEntity(orderRequest, totalAmount);
             List<OrderItem> orderItems = mapCartItemToOrderItem(cartResponse, order);
             order.setOrderItems(orderItems);
-            order.setOrderStatus(OrderStatus.CONFIRMED);
+            //payment logic in future
+            order.setOrderStatus(OrderStatus.PENDING);
             Order saved = orderRepository.save(order);
             saved.setUpdatedAt(LocalDateTime.now());
             // business decision: after successful persistence, confirm inventory
@@ -314,7 +315,7 @@ public class OrderService {
         log.info("Current order status for orderId {}: {}", orderId, currentStatus);
 
         // Check if order can be cancelled (only PENDING or CONFIRMED orders can be cancelled)
-        if(!OrderStatus.CONFIRMED.equals(currentStatus) && !OrderStatus.PENDING.equals(currentStatus)){
+        if(!OrderStatus.PENDING.equals(currentStatus)){
             log.warn("Cannot cancel order with status {} for orderId {}", currentStatus, orderId);
             response.setMessage("Cannot cancel order with status " + currentStatus.name());
             return response;
@@ -338,7 +339,7 @@ public class OrderService {
                 log.info("Released inventory for orderId {}", orderId);
             }
 
-            // Update order status to CANCELLED
+            // Update order status to CANCEL
             orderToCancel.setOrderStatus(OrderStatus.CANCELLED);
             orderToCancel.setUpdatedAt(LocalDateTime.now());
             Order saved = orderRepository.save(orderToCancel);

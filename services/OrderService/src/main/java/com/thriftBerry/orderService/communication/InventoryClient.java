@@ -15,10 +15,13 @@ public interface InventoryClient {
     InventoryResponse reserveInventory(@RequestBody @Valid InventoryRequest request);
 
     @PostMapping("/inventory/release")
-    InventoryResponse releaseInventory(@RequestBody @Valid InventoryRequest request);
+    void releaseInventory(@RequestBody @Valid InventoryRequest request);
 
     @PostMapping("/inventory/confirm")
     InventoryResponse confirmInventory(@RequestBody @Valid InventoryRequest request);
+
+    @PostMapping("/inventory/restock")
+    InventoryResponse updateInventory(@RequestBody @Valid InventoryRequest request);
 
 
 }
