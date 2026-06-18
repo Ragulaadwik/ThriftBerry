@@ -11,6 +11,7 @@ import com.thriftBerry.orderService.dto.inventory.InventoryRequest;
 import com.thriftBerry.orderService.exception.InvalidUserException;
 import com.thriftBerry.orderService.mapper.OrderItemMapper;
 import com.thriftBerry.orderService.repository.OrderRepository;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -286,5 +287,84 @@ public class OrderService {
             list.setMessage("Failed to retrieve orders: " + ex.getMessage());
         }
         return list;
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(Long orderId) {
+        log.debug("Processing order cancellation for orderId: {}", orderId);
+
+        boolean validOrderId = validateOrderId(orderId);
+        OrderResponse response = new OrderResponse();
+
+        if(!validOrderId){
+            log.warn("Invalid orderId provided: {}", orderId);
+            response.setMessage("Invalid OrderId");
+            return response;
+        }
+
+        Optional<Order> order = orderRepository.findById(orderId);
+        if(order.isEmpty()){
+            log.warn("Order not found for orderId: {}", orderId);
+            response.setMessage("Order not found for orderId " + orderId);
+            return response;
+        }
+        
+        Order orderToCancel = order.get();
+        OrderStatus currentStatus = orderToCancel.getOrderStatus();
+        log.info("Current order status for orderId {}: {}", orderId, currentStatus);
+
+        // Check if order can be cancelled (only PENDING or CONFIRMED orders can be cancelled)
+        if(!OrderStatus.CONFIRMED.equals(currentStatus) && !OrderStatus.PENDING.equals(currentStatus)){
+            log.warn("Cannot cancel order with status {} for orderId {}", currentStatus, orderId);
+            response.setMessage("Cannot cancel order with status " + currentStatus.name());
+            return response;
+        }
+
+        try {
+            // Release inventory for all order items
+            Map<Long, Long> inventoryToRelease = new HashMap<>();
+            if(orderToCancel.getOrderItems() != null && !orderToCancel.getOrderItems().isEmpty()){
+                for(OrderItem item : orderToCancel.getOrderItems()){
+                    if(item != null && item.getProductId() != null && item.getQuantity() != null){
+                        inventoryToRelease.put(item.getProductId(), item.getQuantity());
+                        log.debug("Added productId {} quantity {} to release list", item.getProductId(), item.getQuantity());
+                    }
+                }
+            }
+
+            // Release inventory
+            if(!inventoryToRelease.isEmpty()){
+                releaseReservedInventory(inventoryToRelease);
+                log.info("Released inventory for orderId {}", orderId);
+            }
+
+            // Update order status to CANCELLED
+            orderToCancel.setOrderStatus(OrderStatus.CANCELLED);
+            orderToCancel.setUpdatedAt(LocalDateTime.now());
+            Order saved = orderRepository.save(orderToCancel);
+
+            log.info("Order cancelled successfully for orderId {}", orderId);
+            response.setOrderId(saved.getOrderId());
+            response.setStatus(saved.getOrderStatus().name());
+            response.setTotalAmount(saved.getTotalAmount());
+            response.setOrderItems(orderItemMapper.toItemResponseList(saved.getOrderItems()));
+            response.setMessage("Order cancelled successfully");
+            return response;
+
+        } catch (Exception ex) {
+            log.error("Failed to cancel order for orderId {}: {}", orderId, ex.getMessage(), ex);
+            response.setMessage("Failed to cancel order: " + ex.getMessage());
+            return response;
+        }
+    }
+
+    private boolean validateOrderId(Long orderId){
+
+        if(orderId==null || orderId<0){
+            log.warn("Invalid orderId :{}",orderId);
+            return false;
+        }
+
+        return true;
     }
 }

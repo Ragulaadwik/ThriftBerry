@@ -44,4 +44,10 @@ public class OrderController {
 
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
     }
+
+    @PutMapping("/{orderId}/cancel")
+    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable Long orderId){
+        log.info("Request received to cancel order for userId :{}",orderId);
+        return ResponseEntity.ok(orderService.cancelOrder(orderId));
+    }
 }
