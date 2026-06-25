@@ -66,6 +66,12 @@
 			<version>${mapstruct.version}</version>
 		</dependency>
 
+		<!-- 📨 Spring Kafka -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
+
 		<!-- 🪄 Lombok -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -78,6 +84,13 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- 🧪 Kafka Test Support -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
