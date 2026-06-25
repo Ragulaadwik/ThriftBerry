@@ -2,6 +2,7 @@ package com.thriftBerry.orderService.service;
 
 import com.thriftBerry.orderService.communication.CartClient;
 import com.thriftBerry.orderService.communication.InventoryClient;
+import com.thriftBerry.orderService.dto.OrderCreatedEvent;
 import com.thriftBerry.orderService.dto.OrderList;
 import com.thriftBerry.orderService.dto.OrderRequest;
 import com.thriftBerry.orderService.dto.OrderResponse;
@@ -10,16 +11,16 @@ import com.thriftBerry.orderService.dto.cart.CartResponse;
 import com.thriftBerry.orderService.dto.inventory.InventoryRequest;
 import com.thriftBerry.orderService.exception.InvalidUserException;
 import com.thriftBerry.orderService.mapper.OrderItemMapper;
+import com.thriftBerry.orderService.producer.KafkaProducerService;
 import com.thriftBerry.orderService.repository.OrderRepository;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import com.thriftBerry.orderService.dto.inventory.InventoryResponse;
 
@@ -32,18 +33,28 @@ import com.thriftBerry.orderService.enums.OrderStatus;
 @Service
 public class OrderService {
 
+
+
+
+
+
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
     private final OrderRepository orderRepository;
     private final CartClient cartClient;
     private final InventoryClient inventoryClient;
     private final OrderItemMapper orderItemMapper;
+    private final KafkaProducerService kafkaProducerService;
 
-    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper) {
+    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper, KafkaProducerService kafkaProducerService) {
+
+
         this.orderRepository = orderRepository;
         this.cartClient = cartClient;
         this.inventoryClient = inventoryClient;
         this.orderItemMapper = orderItemMapper;
+        this.kafkaProducerService = kafkaProducerService;
     }
+
 
     @Transactional
     public OrderResponse placeOrder(OrderRequest orderRequest) {
@@ -65,7 +76,8 @@ public class OrderService {
         // Reserve inventory for all cart items. Keep track of successfully reserved items so we can release on error.
         Map<Long, Long> reserved = new HashMap<>(); // productId -> quantity
         try {
-            reserved = reserveInventoryForCart(cartResponse);
+
+
 
             // calculate total
             BigDecimal totalAmount = calculateTotal(cartResponse);
@@ -78,11 +90,13 @@ public class OrderService {
             //payment logic in future
             order.setOrderStatus(OrderStatus.PENDING);
             Order saved = orderRepository.save(order);
+
+            publishKafka(saved);
             saved.setUpdatedAt(LocalDateTime.now());
             // business decision: after successful persistence, confirm inventory
-            confirmInventoryForReserved(reserved);
+//            confirmInventoryForReserved(reserved);
 
-            clearCart(orderRequest.getUserId());
+
 
             response.setOrderId(saved.getOrderId());
             response.setTotalAmount(saved.getTotalAmount());
@@ -93,17 +107,24 @@ public class OrderService {
         } catch (Exception ex) {
             log.error("Failed to place order for userId {}: {}", orderRequest.getUserId(), ex.getMessage(), ex);
             // attempt best-effort release of any previously reserved inventory
-            try {
-                if (!reserved.isEmpty()) {
-                    releaseReservedInventory(reserved);
-                }
-            } catch (Exception releaseEx) {
-                log.error("Failed to release inventory after order failure for userId {}: {}", orderRequest.getUserId(), releaseEx.getMessage(), releaseEx);
-            }
+
 
             response.setMessage("Failed to place order: " + ex.getMessage());
             return response;
         }
+    }
+
+    private void publishKafka(Order saved) {
+        OrderCreatedEvent event = new OrderCreatedEvent();
+        event.setOrderItems(orderItemMapper.toOrderItemEventList(saved.getOrderItems()));
+        event.setUserId(saved.getUserId());
+        event.setOrderId(saved.getOrderId());
+        try{
+            kafkaProducerService.publishOrderCreateEvent(event);
+        } catch (Exception ex) {
+            log.error("Failed to publish OrderCreatedEvent for userId {}: {}", saved.getUserId(), ex.getMessage(), ex);
+        }
+
     }
 
     private void clearCart(Long userId) {
@@ -126,37 +147,53 @@ public class OrderService {
     }
 
     private Map<Long, Long> reserveInventoryForCart(CartResponse cartResponse) {
+
+        OrderCreatedEvent event = new OrderCreatedEvent();
+
+        event.setUserId(cartResponse.getUserId());
+
+//        event.setOrderItems(orderItemMapper.toOrderItemEventList(cartResponse.getCartItems()));
+
+//        kafkaTemplate.send("inventory-reserve-topic","OrderService message");
+        log.info("Sent inventory reserve event for userId {}: {}", cartResponse.getUserId(), event);
+        // In a real-world scenario, we would wait for a response or confirmation from the inventory service before proceeding. For this example, we assume the reservation is successful.
+        // Here, we return a map of productId to quantity for the reserved items. In a real implementation,
+
+
+
+
         Map<Long, Long> reserved = new HashMap<>();
-        for (var ci : cartResponse.getCartItems()) {
-            if (ci == null || ci.getProductId() == null || ci.getQuantity() == null) {
-                log.warn("Skipping invalid cart item while reserving inventory: {}", ci);
-                continue;
-            }
 
-            InventoryRequest req = new InventoryRequest();
-            req.setProductId(ci.getProductId());
-            // CartItem.quantity is Long; InventoryRequest.quantity is primitive long
-            long qty = ci.getQuantity();
-            req.setQuantity(qty);
-
-            InventoryResponse resp;
-            try {
-                resp = inventoryClient.reserveInventory(req);
-            } catch (Exception ex) {
-                log.error("Inventory reserve call failed for productId {} qty {}: {}", ci.getProductId(), qty, ex.getMessage(), ex);
-                // throw to trigger release of previously reserved
-                throw ex;
-            }
-
-            // Basic validation of reservation
-            if (resp == null || resp.getReservedQuantity() < qty) {
-                log.error("Inventory reservation insufficient for productId {}. requested={}, reservedResp={}", ci.getProductId(), qty, resp);
-                throw new IllegalStateException("Failed to reserve inventory for productId " + ci.getProductId());
-            }
-
-            reserved.put(ci.getProductId(), qty);
-            log.debug("Reserved inventory for productId {} qty {}", ci.getProductId(), qty);
-        }
+//        for (var ci : cartResponse.getCartItems()) {
+//            if (ci == null || ci.getProductId() == null || ci.getQuantity() == null) {
+//                log.warn("Skipping invalid cart item while reserving inventory: {}", ci);
+//                continue;
+//            }
+//
+//            InventoryRequest req = new InventoryRequest();
+//            req.setProductId(ci.getProductId());
+//            // CartItem.quantity is Long; InventoryRequest.quantity is primitive long
+//            long qty = ci.getQuantity();
+//            req.setQuantity(qty);
+//
+//            InventoryResponse resp;
+//            try {
+//                resp = inventoryClient.reserveInventory(req);
+//            } catch (Exception ex) {
+//                log.error("Inventory reserve call failed for productId {} qty {}: {}", ci.getProductId(), qty, ex.getMessage(), ex);
+//                // throw to trigger release of previously reserved
+//                throw ex;
+//            }
+//
+//            // Basic validation of reservation
+//            if (resp == null || resp.getReservedQuantity() < qty) {
+//                log.error("Inventory reservation insufficient for productId {}. requested={}, reservedResp={}", ci.getProductId(), qty, resp);
+//                throw new IllegalStateException("Failed to reserve inventory for productId " + ci.getProductId());
+//            }
+//
+//            reserved.put(ci.getProductId(), qty);
+//            log.debug("Reserved inventory for productId {} qty {}", ci.getProductId(), qty);
+//        }
         return reserved;
     }
 
@@ -368,4 +405,6 @@ public class OrderService {
 
         return true;
     }
+
+
 }
