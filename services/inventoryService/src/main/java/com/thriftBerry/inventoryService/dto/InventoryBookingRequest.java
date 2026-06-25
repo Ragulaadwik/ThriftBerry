@@ -9,6 +9,11 @@ public class InventoryBookingRequest {
     @Positive(message = "Product ID must be positive")
     private Long productId;
 
+    public InventoryBookingRequest(Long productId, long quantity) {
+        this.productId = productId;
+        this.quantity = quantity;
+    }
+
     public Long getProductId() {
         return productId;
     }
