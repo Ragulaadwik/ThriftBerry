@@ -2,6 +2,7 @@ package com.thriftBerry.orderService.service;
 
 import com.thriftBerry.orderService.communication.CartClient;
 import com.thriftBerry.orderService.communication.InventoryClient;
+import com.thriftBerry.orderService.consumer.KafkaOrderConsumer;
 import com.thriftBerry.orderService.dto.OrderCreatedEvent;
 import com.thriftBerry.orderService.dto.OrderList;
 import com.thriftBerry.orderService.dto.OrderRequest;
@@ -9,13 +10,14 @@ import com.thriftBerry.orderService.dto.OrderResponse;
 
 import com.thriftBerry.orderService.dto.cart.CartResponse;
 import com.thriftBerry.orderService.dto.inventory.InventoryRequest;
-import com.thriftBerry.orderService.exception.InvalidUserException;
+import com.thriftBerry.orderService.exception.*;
 import com.thriftBerry.orderService.mapper.OrderItemMapper;
 import com.thriftBerry.orderService.producer.KafkaProducerService;
 import com.thriftBerry.orderService.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,9 +34,6 @@ import com.thriftBerry.orderService.enums.OrderStatus;
 
 @Service
 public class OrderService {
-
-
-
 
 
 
@@ -78,7 +77,6 @@ public class OrderService {
         try {
 
 
-
             // calculate total
             BigDecimal totalAmount = calculateTotal(cartResponse);
             log.info("Calculated total amount {} for userId {}", totalAmount, orderRequest.getUserId());
@@ -95,7 +93,6 @@ public class OrderService {
             saved.setUpdatedAt(LocalDateTime.now());
             // business decision: after successful persistence, confirm inventory
 //            confirmInventoryForReserved(reserved);
-
 
 
             response.setOrderId(saved.getOrderId());
@@ -119,7 +116,7 @@ public class OrderService {
         event.setOrderItems(orderItemMapper.toOrderItemEventList(saved.getOrderItems()));
         event.setUserId(saved.getUserId());
         event.setOrderId(saved.getOrderId());
-        try{
+        try {
             kafkaProducerService.publishOrderCreateEvent(event);
         } catch (Exception ex) {
             log.error("Failed to publish OrderCreatedEvent for userId {}: {}", saved.getUserId(), ex.getMessage(), ex);
@@ -158,8 +155,6 @@ public class OrderService {
         log.info("Sent inventory reserve event for userId {}: {}", cartResponse.getUserId(), event);
         // In a real-world scenario, we would wait for a response or confirmation from the inventory service before proceeding. For this example, we assume the reservation is successful.
         // Here, we return a map of productId to quantity for the reserved items. In a real implementation,
-
-
 
 
         Map<Long, Long> reserved = new HashMap<>();
@@ -228,13 +223,13 @@ public class OrderService {
         }
     }
 
-    private  void validateUserId(Long userId) {
+    private void validateUserId(Long userId) {
         if (userId == null) {
             log.error("User ID cannot be null");
             throw new InvalidUserException("User ID cannot be null");
         }
         if (userId < 0) {
-            log.error("User ID cannot be negative. Provided: {}",userId);
+            log.error("User ID cannot be negative. Provided: {}", userId);
             throw new InvalidUserException("User ID cannot be negative. Provided: " + userId);
         }
     }
@@ -264,7 +259,7 @@ public class OrderService {
         return orderItems;
     }
 
-    private Order buildOrderEntity(OrderRequest orderRequest,BigDecimal totalAmount){
+    private Order buildOrderEntity(OrderRequest orderRequest, BigDecimal totalAmount) {
         Order order = new Order();
         order.setUserId(orderRequest.getUserId());
         order.setTotalAmount(totalAmount);
@@ -301,11 +296,11 @@ public class OrderService {
         validateUserId(userId);
         OrderList list = new OrderList();
         list.setUserId(userId);
-       List<OrderResponse> response = new ArrayList<>();
-           try {
+        List<OrderResponse> response = new ArrayList<>();
+        try {
             List<Order> orders = orderRepository.findByUserId(userId);
             if (orders != null && !orders.isEmpty()) {
-                for(Order o : orders) {
+                for (Order o : orders) {
                     OrderResponse r = new OrderResponse();
                     r.setOrderId(o.getOrderId());
                     r.setTotalAmount(o.getTotalAmount());
@@ -334,25 +329,25 @@ public class OrderService {
         boolean validOrderId = validateOrderId(orderId);
         OrderResponse response = new OrderResponse();
 
-        if(!validOrderId){
+        if (!validOrderId) {
             log.warn("Invalid orderId provided: {}", orderId);
             response.setMessage("Invalid OrderId");
             return response;
         }
 
         Optional<Order> order = orderRepository.findById(orderId);
-        if(order.isEmpty()){
+        if (order.isEmpty()) {
             log.warn("Order not found for orderId: {}", orderId);
             response.setMessage("Order not found for orderId " + orderId);
             return response;
         }
-        
+
         Order orderToCancel = order.get();
         OrderStatus currentStatus = orderToCancel.getOrderStatus();
         log.info("Current order status for orderId {}: {}", orderId, currentStatus);
 
         // Check if order can be cancelled (only PENDING or CONFIRMED orders can be cancelled)
-        if(!OrderStatus.PENDING.equals(currentStatus)){
+        if (!OrderStatus.PENDING.equals(currentStatus)) {
             log.warn("Cannot cancel order with status {} for orderId {}", currentStatus, orderId);
             response.setMessage("Cannot cancel order with status " + currentStatus.name());
             return response;
@@ -361,9 +356,9 @@ public class OrderService {
         try {
             // Release inventory for all order items
             Map<Long, Long> inventoryToRelease = new HashMap<>();
-            if(orderToCancel.getOrderItems() != null && !orderToCancel.getOrderItems().isEmpty()){
-                for(OrderItem item : orderToCancel.getOrderItems()){
-                    if(item != null && item.getProductId() != null && item.getQuantity() != null){
+            if (orderToCancel.getOrderItems() != null && !orderToCancel.getOrderItems().isEmpty()) {
+                for (OrderItem item : orderToCancel.getOrderItems()) {
+                    if (item != null && item.getProductId() != null && item.getQuantity() != null) {
                         inventoryToRelease.put(item.getProductId(), item.getQuantity());
                         log.debug("Added productId {} quantity {} to release list", item.getProductId(), item.getQuantity());
                     }
@@ -371,7 +366,7 @@ public class OrderService {
             }
 
             // Release inventory
-            if(!inventoryToRelease.isEmpty()){
+            if (!inventoryToRelease.isEmpty()) {
                 releaseReservedInventory(inventoryToRelease);
                 log.info("Released inventory for orderId {}", orderId);
             }
@@ -396,10 +391,10 @@ public class OrderService {
         }
     }
 
-    private boolean validateOrderId(Long orderId){
+    private boolean validateOrderId(Long orderId) {
 
-        if(orderId==null || orderId<0){
-            log.warn("Invalid orderId :{}",orderId);
+        if (orderId == null || orderId < 0) {
+            log.warn("Invalid orderId :{}", orderId);
             return false;
         }
 
@@ -407,4 +402,41 @@ public class OrderService {
     }
 
 
+    public void confirmOrder(String orderId) {
+
+        log.debug("Processing order confirmation for orderId: {}", orderId);
+
+        if (orderId == null || orderId.isEmpty()) {
+            log.warn("Invalid orderId provided: {}", orderId);
+            throw new InvalidOrderException("Invalid OrderId");
+        }
+
+        Optional<Order> orderOpt = orderRepository.findById(Long.valueOf(orderId));
+        if (orderOpt.isEmpty()) {
+            log.warn("Order not found for orderId: {}", orderId);
+            throw new OrderNotFoundException("Order not found for orderId " + orderId);
+        }
+
+        Order orderToConfirm = orderOpt.get();
+        OrderStatus currentStatus = orderToConfirm.getOrderStatus();
+        log.info("Current order status for orderId {}: {}", orderId, currentStatus);
+
+        // Check if order can be confirmed (only PENDING orders can be confirmed)
+        if (!OrderStatus.PENDING.equals(currentStatus)) {
+            log.warn("Cannot confirm order with status {} for orderId {}", currentStatus, orderId);
+            throw new InvalidOrderStateException("Cannot confirm order with status " + currentStatus.name());
+        }
+
+        try {
+
+            orderToConfirm.setOrderStatus(OrderStatus.CONFIRMED);
+            orderToConfirm.setUpdatedAt(LocalDateTime.now());
+            Order saved = orderRepository.save(orderToConfirm);
+            cartClient.clearCart(saved.getUserId());
+            log.info("Order confirmed successfully for orderId {}", orderId);
+        } catch (Exception ex) {
+            log.error("Failed to confirm order for orderId {}: {}", orderId, ex.getMessage(), ex);
+            throw new OrderProcessingException("Failed to confirm order: " + ex.getMessage());
+        }
+    }
 }
