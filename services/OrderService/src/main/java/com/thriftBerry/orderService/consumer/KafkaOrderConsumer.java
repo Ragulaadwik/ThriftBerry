@@ -23,7 +23,7 @@ private final OrderService orderService;
     @KafkaListener(topics = "reserve-success", groupId = "order_group")
     public void consumeSuccessEvent(String orderId) {
         log.info(" Success Message received -> {}", orderId);
-        orderService.confirmOrder(orderId);
+        orderService.initiatePayment(orderId);
 
     }
 
@@ -37,6 +37,13 @@ private final OrderService orderService;
     public void consume(String message) {
         System.out.println("consume Event");
         log.info(" Message received ->{} ", message);
+        orderService.cancelOrder(Long.valueOf(message));
+    }
+
+    @KafkaListener(topics = "payment-success",groupId = "order-group")
+    public void consumePaymentSuccessEvent(String orderId){
+        log.info("Payment Success Message received -> {}", orderId);
+        orderService.confirmOrder(orderId);
     }
 
 

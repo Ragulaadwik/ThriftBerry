@@ -44,6 +44,7 @@ public class OrderService {
     private final OrderItemMapper orderItemMapper;
     private final KafkaProducerService kafkaProducerService;
 
+
     public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper, KafkaProducerService kafkaProducerService) {
 
 
@@ -276,6 +277,7 @@ public class OrderService {
             if (orderOpt.isPresent()) {
                 Order order = orderOpt.get();
                 response.setOrderId(order.getOrderId());
+                response.setUserId(order.getUserId());
                 response.setTotalAmount(order.getTotalAmount());
                 response.setStatus(order.getOrderStatus().name());
                 response.setOrderItems(orderItemMapper.toItemResponseList(order.getOrderItems()));
@@ -302,6 +304,7 @@ public class OrderService {
             if (orders != null && !orders.isEmpty()) {
                 for (Order o : orders) {
                     OrderResponse r = new OrderResponse();
+
                     r.setOrderId(o.getOrderId());
                     r.setTotalAmount(o.getTotalAmount());
                     r.setStatus(o.getOrderStatus().name());
@@ -438,5 +441,10 @@ public class OrderService {
             log.error("Failed to confirm order for orderId {}: {}", orderId, ex.getMessage(), ex);
             throw new OrderProcessingException("Failed to confirm order: " + ex.getMessage());
         }
+    }
+
+    public void initiatePayment(String orderId) {
+        log.info("Initiating payment for orderId: {}", orderId);
+          kafkaProducerService.publishInitiatePaymentEvent(orderId);
     }
 }
