@@ -375,11 +375,11 @@ public class OrderService {
             }
 
             // Update order status to CANCEL
-            orderToCancel.setOrderStatus(OrderStatus.CANCELLED);
+            orderToCancel.setOrderStatus(OrderStatus.FAILED);
             orderToCancel.setUpdatedAt(LocalDateTime.now());
             Order saved = orderRepository.save(orderToCancel);
 
-            log.info("Order cancelled successfully for orderId {}", orderId);
+            log.info("Order Cancelled  for orderId {}", orderId);
             response.setOrderId(saved.getOrderId());
             response.setStatus(saved.getOrderStatus().name());
             response.setTotalAmount(saved.getTotalAmount());
