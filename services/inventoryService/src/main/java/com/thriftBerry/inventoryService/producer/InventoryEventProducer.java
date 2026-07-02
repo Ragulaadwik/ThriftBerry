@@ -17,11 +17,11 @@ public class InventoryEventProducer {
 
     public void publishSuccessEvent(String orderId) {
         log.info("Publishing reservation success event for order ID: {}", orderId);
-        kafkaTemplate.send("reserve-success", "Reservation successful for order ID: " + orderId);
+        kafkaTemplate.send("reserve-success",  orderId);
     }
 
     public void publishFailureEvent(String orderId, String errorMessage) {
         log.info("Publishing reservation failure event for order ID: {}", orderId);
-        kafkaTemplate.send("reserve-failure", "Reservation failed for order ID: " + orderId + ". Error: " + errorMessage);
+        kafkaTemplate.send("reserve-failure",  orderId + ". Error: " + errorMessage);
     }
 }
