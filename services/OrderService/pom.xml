@@ -20,6 +20,7 @@
 		<java.version>17</java.version>
 		<mapstruct.version>1.5.5.Final</mapstruct.version>
 		<spring-cloud.version>2025.1.2</spring-cloud.version>
+		<resilience4j.version>2.3.0</resilience4j.version>
 	</properties>
 
 	<dependencies>
@@ -52,11 +53,18 @@
 			<artifactId>spring-cloud-starter-openfeign</artifactId>
 		</dependency>
 
+
+
+		<!-- Spring Cloud Circuit Breaker -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
+		</dependency>
+
 		<!-- Kafka -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka</artifactId>
-			<version>3.0.0</version> <!-- Use the latest version -->
 		</dependency>
 
 		<!-- MapStruct -->
@@ -99,7 +107,6 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Kafka Test Support -->
 		<dependency>
 			<groupId>org.springframework.kafka</groupId>
 			<artifactId>spring-kafka-test</artifactId>
@@ -193,6 +200,7 @@
 					</execution>
 
 				</executions>
+
 			</plugin>
 
 		</plugins>
