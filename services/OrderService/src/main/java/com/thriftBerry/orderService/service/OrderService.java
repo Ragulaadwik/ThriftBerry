@@ -14,6 +14,8 @@ import com.thriftBerry.orderService.exception.*;
 import com.thriftBerry.orderService.mapper.OrderItemMapper;
 import com.thriftBerry.orderService.producer.KafkaProducerService;
 import com.thriftBerry.orderService.repository.OrderRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,9 +45,10 @@ public class OrderService {
     private final InventoryClient inventoryClient;
     private final OrderItemMapper orderItemMapper;
     private final KafkaProducerService kafkaProducerService;
+    private  final CartServiceWrapper cartServiceWrapper;
 
 
-    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper, KafkaProducerService kafkaProducerService) {
+    public OrderService(OrderRepository orderRepository, CartClient cartClient, InventoryClient inventoryClient, OrderItemMapper orderItemMapper, KafkaProducerService kafkaProducerService, CartServiceWrapper cartServiceWrapper) {
 
 
         this.orderRepository = orderRepository;
@@ -53,6 +56,7 @@ public class OrderService {
         this.inventoryClient = inventoryClient;
         this.orderItemMapper = orderItemMapper;
         this.kafkaProducerService = kafkaProducerService;
+        this.cartServiceWrapper = cartServiceWrapper;
     }
 
 
@@ -66,7 +70,7 @@ public class OrderService {
         OrderResponse response = new OrderResponse();
 
         // Fetch cart
-        CartResponse cartResponse = fetchCart(orderRequest.getUserId());
+        CartResponse cartResponse = cartServiceWrapper.fetchCart(orderRequest.getUserId());
         if (cartResponse == null || cartResponse.getCartItems() == null || cartResponse.getCartItems().isEmpty()) {
             log.warn("Cart is empty for userId: {}", orderRequest.getUserId());
             response.setMessage("Cart is empty");
@@ -125,24 +129,10 @@ public class OrderService {
 
     }
 
-    private void clearCart(Long userId) {
-        try {
-            cartClient.clearCart(userId);
-            log.info("Cleared cart for userId {}", userId);
-        } catch (Exception ex) {
-            log.error("Failed to clear cart for userId {}: {}", userId, ex.getMessage(), ex);
 
-        }
-    }
 
-    private CartResponse fetchCart(Long userId) {
-        try {
-            return cartClient.getCart(userId);
-        } catch (Exception ex) {
-            log.error("Error fetching cart for userId {}: {}", userId, ex.getMessage(), ex);
-            throw ex;
-        }
-    }
+
+
 
     private Map<Long, Long> reserveInventoryForCart(CartResponse cartResponse) {
 
@@ -435,7 +425,7 @@ public class OrderService {
             orderToConfirm.setOrderStatus(OrderStatus.CONFIRMED);
             orderToConfirm.setUpdatedAt(LocalDateTime.now());
             Order saved = orderRepository.save(orderToConfirm);
-            cartClient.clearCart(saved.getUserId());
+            cartServiceWrapper.clearCart(saved.getUserId());
             log.info("Order confirmed successfully for orderId {}", orderId);
         } catch (Exception ex) {
             log.error("Failed to confirm order for orderId {}: {}", orderId, ex.getMessage(), ex);
