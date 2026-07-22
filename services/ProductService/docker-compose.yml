@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: thriftBerry_product_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - ecommerce-network
+
+  productservice:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: productservice-container
+    restart: always
+    depends_on:
+      - mysql
+    ports:
+      - "8081:8081"
+    environment:
+        SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/thriftBerry_product_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false
+        SPRING_DATASOURCE_USERNAME: root
+        SPRING_DATOURCE_PASSWORD: root
+        EUREKA_CLIENT_ENABLED: false
+    networks:
+      - ecommerce-network
+
+volumes:
+  mysql-data:
+
+networks:
+  ecommerce-network:
+    driver: bridge
