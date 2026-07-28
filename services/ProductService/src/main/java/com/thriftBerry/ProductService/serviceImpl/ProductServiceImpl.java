@@ -3,6 +3,7 @@ package com.thriftBerry.ProductService.serviceImpl;
 import com.thriftBerry.ProductService.dto.ProductRequestDto;
 import com.thriftBerry.ProductService.dto.ProductRequestOptionalFields;
 import com.thriftBerry.ProductService.entity.Product;
+import com.thriftBerry.ProductService.exception.InvalidProductException;
 import com.thriftBerry.ProductService.exception.ProductNotFoundException;
 import com.thriftBerry.ProductService.mapper.ProductMapper;
 import com.thriftBerry.ProductService.repository.ProductRepository;
@@ -29,6 +30,10 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional
     public Product addProduct(ProductRequestDto productRequestDto) {
+
+        if(productRequestDto==null || productRequestDto.getPrice().intValue()<0 || productRequestDto.getProductName().isBlank()){
+            throw new InvalidProductException("Invalid product data provided. Product name cannot be blank and price must be non-negative.");
+        }
         Product product = productMapper.toProduct(productRequestDto);
         return productRepository.save(product);
     }
