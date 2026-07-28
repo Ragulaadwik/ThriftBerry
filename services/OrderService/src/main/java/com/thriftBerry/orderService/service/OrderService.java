@@ -140,45 +140,11 @@ public class OrderService {
 
         event.setUserId(cartResponse.getUserId());
 
-//        event.setOrderItems(orderItemMapper.toOrderItemEventList(cartResponse.getCartItems()));
-
-//        kafkaTemplate.send("inventory-reserve-topic","OrderService message");
         log.info("Sent inventory reserve event for userId {}: {}", cartResponse.getUserId(), event);
-        // In a real-world scenario, we would wait for a response or confirmation from the inventory service before proceeding. For this example, we assume the reservation is successful.
-        // Here, we return a map of productId to quantity for the reserved items. In a real implementation,
-
 
         Map<Long, Long> reserved = new HashMap<>();
 
-//        for (var ci : cartResponse.getCartItems()) {
-//            if (ci == null || ci.getProductId() == null || ci.getQuantity() == null) {
-//                log.warn("Skipping invalid cart item while reserving inventory: {}", ci);
-//                continue;
-//            }
-//
-//            InventoryRequest req = new InventoryRequest();
-//            req.setProductId(ci.getProductId());
-//            // CartItem.quantity is Long; InventoryRequest.quantity is primitive long
-//            long qty = ci.getQuantity();
-//            req.setQuantity(qty);
-//
-//            InventoryResponse resp;
-//            try {
-//                resp = inventoryClient.reserveInventory(req);
-//            } catch (Exception ex) {
-//                log.error("Inventory reserve call failed for productId {} qty {}: {}", ci.getProductId(), qty, ex.getMessage(), ex);
-//                // throw to trigger release of previously reserved
-//                throw ex;
-//            }
-//
-//            // Basic validation of reservation
-//            if (resp == null || resp.getReservedQuantity() < qty) {
-//                log.error("Inventory reservation insufficient for productId {}. requested={}, reservedResp={}", ci.getProductId(), qty, resp);
-//                throw new IllegalStateException("Failed to reserve inventory for productId " + ci.getProductId());
-//            }
-//
-//            reserved.put(ci.getProductId(), qty);
-//            log.debug("Reserved inventory for productId {} qty {}", ci.getProductId(), qty);
+
 //        }
         return reserved;
     }
@@ -307,10 +273,12 @@ public class OrderService {
                 list.setMessage("Orders retrieved successfully");
             } else {
                 list.setMessage("No orders found for userId " + userId);
+                throw new OrderNotFoundException("No orders found for userId " + userId);
             }
         } catch (Exception ex) {
             log.error("Failed to retrieve orders for userId {}: {}", userId, ex.getMessage(), ex);
             list.setMessage("Failed to retrieve orders: " + ex.getMessage());
+            throw new OrderProcessingException("Failed to retrieve orders: " + ex.getMessage());
         }
         return list;
     }
