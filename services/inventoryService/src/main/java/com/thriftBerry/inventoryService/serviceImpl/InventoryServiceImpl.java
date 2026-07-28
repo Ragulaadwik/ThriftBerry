@@ -1,6 +1,7 @@
 package com.thriftBerry.inventoryService.serviceImpl;
 
 import com.thriftBerry.inventoryService.dto.*;
+import com.thriftBerry.inventoryService.exception.InvalidRequestException;
 import com.thriftBerry.inventoryService.exception.InventoryConflictException;
 import com.thriftBerry.inventoryService.exception.InventoryNotFoundException;
 import com.thriftBerry.inventoryService.mapper.InventoryMapper;
@@ -46,6 +47,8 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventoryResponse getInventoryById(Long id) {
+
+
         Inventory inventory= inventoryRepository.findById(id).orElseThrow(()->new InventoryNotFoundException(id));
         log.info("Retrieved inventory for id: {}, productId: {}, availableStock: {}", inventory.getId(), inventory.getProductId(), inventory.getAvailableStock());
 
@@ -104,6 +107,10 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public AvailabilityResponse checkAvailability(Long productId, Long available) {
+        if(productId==null ||  available==null || available<0){
+            log.error("Invalid availability check request: productId={}, available={}", productId, available);
+            throw new InvalidRequestException("Product ID and available quantity must be provided and valid");
+        }
         Inventory product = getInventoryOrThrow(productId);
 
         AvailabilityResponse availabilityResponse = new AvailabilityResponse();
@@ -120,7 +127,7 @@ public class InventoryServiceImpl implements InventoryService {
         // Validate input quantity
         if (request == null || request.getQuantity() <= 0) {
             log.error("Invalid restock request: {}", request);
-            throw new IllegalArgumentException("Restock quantity must be a positive value");
+            throw new InvalidRequestException("Restock quantity must be a positive value");
         }
 
         // Retrieve inventory by productId (throws InventoryNotFoundException if missing)
