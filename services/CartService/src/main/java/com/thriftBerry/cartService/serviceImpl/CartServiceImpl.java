@@ -5,7 +5,10 @@ import com.thriftBerry.cartService.communication.ProductClient;
 import com.thriftBerry.cartService.dto.AvailabilityResponse;
 import com.thriftBerry.cartService.dto.CartItemRequest;
 import com.thriftBerry.cartService.dto.ProductDto;
+import com.thriftBerry.cartService.exceptions.CartFetchException;
+import com.thriftBerry.cartService.exceptions.CartNotFoundException;
 import com.thriftBerry.cartService.exceptions.InvalidInputException;
+import com.thriftBerry.cartService.exceptions.ProductNotFoundException;
 import com.thriftBerry.cartService.model.Cart;
 import com.thriftBerry.cartService.model.CartItem;
 import com.thriftBerry.cartService.repository.CartRepository;
@@ -124,20 +127,7 @@ public class CartServiceImpl implements CartService {
         validateUserId(request.getUserId());
     }
 
-    /**
-     * Retrieves the cart for a specific user.
-     * <p>
-     * Industry standard improvements:
-     * - Input validation to prevent invalid user IDs
-     * - Returns Optional instead of null to avoid NullPointerException
-     * - Comprehensive logging with appropriate log levels
-     * - Exception handling with custom exceptions
-     * - Clear error messages for debugging
-     *
-     * @param userId the user ID to fetch the cart for
-     * @return Optional containing the Cart if found, empty Optional if not found
-     * @throws InvalidInputException if userId is null or invalid
-     */
+
     @Override
     @Transactional(readOnly = true)
     public Cart getCartByUserId(Long userId) {
@@ -148,7 +138,7 @@ public class CartServiceImpl implements CartService {
         log.debug("Fetching cart for userId: {}", userId);
         
         try {
-            Cart cart = cartRepository.findByUserId(userId).orElseThrow( ()->new RuntimeException("Cart not found for user: " + userId));
+            Cart cart = cartRepository.findByUserId(userId).orElseThrow( ()->new CartNotFoundException("Cart not found for user: " + userId));
             
             log.info("Cart retrieved successfully for userId: {}. Cart contains {} items.",
                      userId, cart.getCartItems().size());
@@ -158,27 +148,11 @@ public class CartServiceImpl implements CartService {
             
         } catch (Exception e) {
             log.error("Error occurred while fetching cart for userId: {}", userId, e);
-            throw new RuntimeException("Failed to retrieve cart for user: " + userId, e);
+            throw new CartFetchException("Failed to retrieve cart for user: " + userId, e);
         }
     }
 
-    /**
-     * Updates a product quantity in the user's cart.
-     * <p>
-     * Industry standard improvements:
-     * - Input validation for request data
-     * - Transactional handling for data consistency
-     * - Inventory verification before update
-     * - Validates product exists in cart before updating
-     * - Comprehensive logging with appropriate log levels
-     * - Proper exception handling
-     * - Clear error messages for debugging
-     *
-     * @param cartItemRequest the cart item request containing userId, productId, and new quantity
-     * @return updated Cart object
-     * @throws InvalidInputException if cartItemRequest is invalid
-     * @throws RuntimeException      if product not found in cart or inventory check fails
-     */
+
     @Override
     @Transactional
     public Cart updateCartItem(CartItemRequest cartItemRequest) {
@@ -206,7 +180,7 @@ public class CartServiceImpl implements CartService {
             if (existingItem.isEmpty()) {
                 log.warn("Product not found in cart for update. UserId: {}, ProductId: {}",
                          cartItemRequest.getUserId(), cartItemRequest.getProductId());
-                throw new RuntimeException("Product with ID: " + cartItemRequest.getProductId() + 
+                throw new ProductNotFoundException("Product with ID: " + cartItemRequest.getProductId() +
                                          " not found in cart for user: " + cartItemRequest.getUserId());
             }
 
@@ -421,6 +395,6 @@ public class CartServiceImpl implements CartService {
 
     private Cart getCartByUserIdOrThrow(Long userId){
         return cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + userId));
+                .orElseThrow(() -> new CartNotFoundException("Cart not found for user: " + userId));
     }
 }
